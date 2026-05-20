@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 
 st.set_page_config(page_title="Electronics Sales Dashboard", layout="wide")
 st.title("📊 Electronics Sales Analytics")
@@ -11,6 +12,105 @@ def load_data(query):
     data = pd.read_sql_query(query, conn)
     conn.close()
     return data
+
+@st.cache_data
+def get_tree_feature_importance():
+    sales_data = load_data("""
+        SELECT
+            Date,
+            Product_Name,
+            Category,
+            Brand,
+            Unit_Price,
+            Discount_Percent,
+            Selling_Price,
+            Quantity,
+            Revenue,
+            City,
+            Region,
+            Sales_Channel,
+            Payment_Method,
+            Return_Flag,
+            Customer_Segment,
+            Festival_Season
+        FROM sales_data
+    """)
+
+    sales_data['Date'] = pd.to_datetime(sales_data['Date'], errors='coerce')
+    required_cols = [
+        'Date', 'Product_Name', 'Category', 'Brand', 'Unit_Price',
+        'Discount_Percent', 'Selling_Price', 'Quantity', 'Revenue', 'City',
+        'Region', 'Sales_Channel', 'Payment_Method', 'Return_Flag',
+        'Customer_Segment', 'Festival_Season'
+    ]
+    sales_data = sales_data.dropna(subset=required_cols)
+
+    if len(sales_data) < 50:
+        return pd.DataFrame()
+
+    sales_data['MonthNum'] = sales_data['Date'].dt.month
+    sales_data['DayOfWeek'] = sales_data['Date'].dt.dayofweek
+    sales_data['DayOfMonth'] = sales_data['Date'].dt.day
+    sales_data['WeekOfYear'] = sales_data['Date'].dt.isocalendar().week.astype(int)
+    sales_data['IsWeekend'] = (sales_data['DayOfWeek'] >= 5).astype(int)
+    sales_data['Festival_Season'] = sales_data['Festival_Season'].astype(int)
+    sales_data['Return_Flag_Num'] = (sales_data['Return_Flag'] == 'Yes').astype(int)
+
+    numeric_features = [
+        'Unit_Price', 'Discount_Percent', 'Selling_Price', 'Quantity',
+        'MonthNum', 'DayOfWeek', 'DayOfMonth', 'WeekOfYear', 'IsWeekend',
+        'Festival_Season', 'Return_Flag_Num'
+    ]
+    categorical_features = [
+        'Product_Name', 'Category', 'Brand', 'City', 'Region',
+        'Sales_Channel', 'Payment_Method', 'Customer_Segment'
+    ]
+
+    X = pd.get_dummies(
+        sales_data[numeric_features + categorical_features],
+        columns=categorical_features,
+        dtype=int
+    )
+    y = sales_data['Revenue']
+
+    models = {
+        'Random Forest': RandomForestRegressor(
+            n_estimators=120,
+            min_samples_leaf=2,
+            random_state=42,
+            n_jobs=1
+        ),
+        'Gradient Boosting': GradientBoostingRegressor(
+            n_estimators=120,
+            random_state=42
+        )
+    }
+
+    def feature_group(encoded_feature):
+        for categorical_feature in categorical_features:
+            if encoded_feature.startswith(f'{categorical_feature}_'):
+                return categorical_feature
+        return encoded_feature
+
+    grouped_importances = {}
+    groups = pd.Series([feature_group(col) for col in X.columns], index=X.columns)
+
+    for model_name, model in models.items():
+        model.fit(X, y)
+        importances = pd.Series(model.feature_importances_, index=X.columns)
+        importances = importances / importances.sum()
+        grouped_importances[model_name] = importances.groupby(groups).sum()
+
+    importance_df = pd.DataFrame(grouped_importances).fillna(0)
+    importance_df['Average_Importance'] = importance_df.mean(axis=1)
+    importance_df = (
+        importance_df
+        .sort_values('Average_Importance', ascending=False)
+        .head(12)
+        .reset_index()
+        .rename(columns={'index': 'Feature'})
+    )
+    return importance_df
 
 st.subheader("Executive Summary")
 kpi_data = load_data("""
@@ -79,7 +179,49 @@ chart = alt.Chart(monthly_data).mark_bar().encode(
     width='container' 
 )
 
-st.altair_chart(chart, use_container_width=True)
+st.altair_chart(chart, width='stretch')
+
+st.divider()
+
+st.subheader("Tree-Based Feature Importance")
+with st.spinner("Training tree models on current sales data..."):
+    feature_importance = get_tree_feature_importance()
+
+if feature_importance.empty:
+    st.warning("Not enough complete records are available to calculate feature importance.")
+else:
+    top_feature = feature_importance.iloc[0]
+    fi_chart_data = feature_importance.sort_values('Average_Importance', ascending=True)
+
+    fi_col1, fi_col2 = st.columns([2, 1])
+    with fi_col1:
+        fi_chart = alt.Chart(fi_chart_data).mark_bar(color='#4c78a8').encode(
+            x=alt.X('Average_Importance:Q', title='Average Importance'),
+            y=alt.Y('Feature:N', title='Feature', sort=None),
+            tooltip=[
+                alt.Tooltip('Feature:N'),
+                alt.Tooltip('Average_Importance:Q', format='.2%'),
+                alt.Tooltip('Random Forest:Q', format='.2%'),
+                alt.Tooltip('Gradient Boosting:Q', format='.2%')
+            ]
+        ).properties(height=360)
+        st.altair_chart(fi_chart, width='stretch')
+
+    with fi_col2:
+        st.metric(
+            label="Top Revenue Driver",
+            value=top_feature['Feature'],
+            delta=f"{top_feature['Average_Importance']:.1%} avg importance"
+        )
+        st.dataframe(
+            feature_importance.style.format({
+                'Average_Importance': '{:.2%}',
+                'Random Forest': '{:.2%}',
+                'Gradient Boosting': '{:.2%}'
+            }),
+            width='stretch',
+            hide_index=True
+        )
 
 st.divider()
 
