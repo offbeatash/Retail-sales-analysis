@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local app secrets and environment files
+.env
+.env.*
+!.env.example
+secrets.toml
+.streamlit/secrets.toml
+
+# Local databases and raw business data
+*.db
+*.sqlite
+*.sqlite3
+*.csv
+*.pbix
+
+# Generated reports and exports
+reports/
+*.pptx
+*.pdf
+*.xlsx
+
+# Runtime logs
+*.log
+*.err.log
+streamlit*.log
+
+# OS/editor clutter
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
