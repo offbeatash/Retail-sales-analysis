@@ -1,5 +1,6 @@
 # Python
 __pycache__/
+.pycache-check/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
@@ -14,8 +15,18 @@ env/
 .env
 .env.*
 !.env.example
+*.local
 secrets.toml
 .streamlit/secrets.toml
+credentials*.json
+service-account*.json
+*service_account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
 
 # Local databases and raw business data
 *.db
@@ -26,9 +37,23 @@ secrets.toml
 
 # Generated reports and exports
 reports/
+*.png
 *.pptx
 *.pdf
 *.xlsx
+*.zip
+
+# Notebook/runtime artifacts
+.ipynb_checkpoints/
+*.checkpoint.ipynb
+
+# Test and coverage output
+.coverage
+coverage.xml
+htmlcov/
+dist/
+build/
+*.egg-info/
 
 # Runtime logs
 *.log

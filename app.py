@@ -11,8 +11,6 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.figure import Figure
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 
-st.set_page_config(page_title="Electronics Sales Dashboard", layout="wide")
-st.title("📊 Electronics Sales Analytics")
 
 def get_connection():
     return sqlite3.connect('sales_database.db')
@@ -146,16 +144,6 @@ SELECT
 FROM sales_data
 GROUP BY Category;
 
-CREATE VIEW IF NOT EXISTS crystal_top_products AS
-SELECT
-    Product_Name,
-    Brand,
-    Category,
-    COUNT(*) AS Orders,
-    ROUND(SUM(Revenue), 2) AS Total_Revenue,
-    ROUND(SUM(Profit), 2) AS Total_Profit
-FROM sales_data
-GROUP BY Product_Name, Brand, Category;
 """
 
 

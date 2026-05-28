@@ -1,0 +1,12 @@
+altair
+jupyter
+matplotlib
+numpy
+pandas
+plotly
+pytest
+scikit-learn
+seaborn
+selenium
+streamlit
+xgboost
